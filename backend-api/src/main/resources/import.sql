@@ -1,0 +1,2 @@
+INSERT INTO members (first_name, last_name, email, subscription_type, registration_date, active) VALUES ('Jean', 'Dupont', 'jean@gmail.com', 'PREMIUM', '2026-01-10', true);
+INSERT INTO members (first_name, last_name, email, subscription_type, registration_date, active) VALUES ('Sara', 'Meknes', 'sara@gmail.com', 'BASIC', '2026-02-15', true);

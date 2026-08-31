@@ -1,0 +1,29 @@
+# ── Java / Spring Boot ──────────────────
+backend-api/target/
+backend-api/.mvn/wrapper/maven-wrapper.jar
+*.class
+*.jar
+*.war
+*.ear
+*.log
+
+# ── Angular ─────────────────────────────
+gym-frontend/node_modules/
+gym-frontend/dist/
+gym-frontend/.angular/
+
+# ── IDE ─────────────────────────────────
+.idea/
+.vscode/settings.json
+*.iml
+
+# ── OS ──────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Environnement ────────────────────────
+.env
+*.env.local
+
+# ── Docker ──────────────────────────────
+docker-compose.override.yml
