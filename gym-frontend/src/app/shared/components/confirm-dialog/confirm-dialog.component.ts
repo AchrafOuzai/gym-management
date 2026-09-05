@@ -19,7 +19,6 @@ export interface ConfirmDialogData {
   template: `
     <div class="dialog-container">
 
-      <!-- Icon -->
       <div class="dialog-icon" [ngClass]="data.type || 'danger'">
         <mat-icon>
           {{ data.type === 'warning' ? 'warning' :
@@ -27,19 +26,17 @@ export interface ConfirmDialogData {
         </mat-icon>
       </div>
 
-      <!-- Title -->
       <h2 class="dialog-title">{{ data.title }}</h2>
 
-      <!-- Message -->
-      <p class="dialog-message">{{ data.message }}</p>
+      <p class="dialog-message" style="white-space: pre-line">{{ data.message }}</p>
 
-      <!-- Actions -->
       <div class="dialog-actions">
         <button mat-stroked-button
                 class="cancel-btn"
-                (click)="onCancel()">
+                (click)="onCancel()"
+                *ngIf="data.cancelText">
           <mat-icon>close</mat-icon>
-          {{ data.cancelText || 'Annuler' }}
+          {{ data.cancelText }}
         </button>
         <button mat-raised-button
                 class="confirm-btn"
@@ -49,7 +46,7 @@ export interface ConfirmDialogData {
             {{ data.type === 'warning' ? 'warning' :
                data.type === 'info'    ? 'check' : 'delete' }}
           </mat-icon>
-          {{ data.confirmText || 'Supprimer' }}
+          {{ data.confirmText || 'Confirmer' }}
         </button>
       </div>
 
@@ -61,11 +58,10 @@ export interface ConfirmDialogData {
       flex-direction: column;
       align-items: center;
       padding: 32px 28px 24px;
-      max-width: 420px;
+      max-width: 440px;
       text-align: center;
     }
 
-    /* ── Icon circle ── */
     .dialog-icon {
       width: 72px;
       height: 72px;
@@ -74,30 +70,23 @@ export interface ConfirmDialogData {
       align-items: center;
       justify-content: center;
       margin-bottom: 20px;
-
-      mat-icon {
-        font-size: 36px;
-        width: 36px;
-        height: 36px;
-      }
-
-      &.danger {
-        background: #ffebee;
-        mat-icon { color: #f44336; }
-      }
-
-      &.warning {
-        background: #fff8e1;
-        mat-icon { color: #ff9800; }
-      }
-
-      &.info {
-        background: #e3f2fd;
-        mat-icon { color: #2196f3; }
-      }
     }
 
-    /* ── Title ── */
+    .dialog-icon mat-icon {
+      font-size: 36px;
+      width: 36px;
+      height: 36px;
+    }
+
+    .dialog-icon.danger  { background: #ffebee; }
+    .dialog-icon.danger mat-icon  { color: #f44336; }
+
+    .dialog-icon.warning { background: #fff8e1; }
+    .dialog-icon.warning mat-icon { color: #ff9800; }
+
+    .dialog-icon.info    { background: #e3f2fd; }
+    .dialog-icon.info mat-icon    { color: #2196f3; }
+
     .dialog-title {
       font-size: 20px;
       font-weight: 700;
@@ -105,15 +94,18 @@ export interface ConfirmDialogData {
       margin: 0 0 12px;
     }
 
-    /* ── Message ── */
     .dialog-message {
       font-size: 14px;
-      color: #666;
-      line-height: 1.6;
+      color: #555;
+      line-height: 1.7;
       margin: 0 0 28px;
+      text-align: left;
+      width: 100%;
+      background: #f8f9fa;
+      border-radius: 8px;
+      padding: 12px 16px;
     }
 
-    /* ── Actions ── */
     .dialog-actions {
       display: flex;
       gap: 12px;
@@ -127,31 +119,31 @@ export interface ConfirmDialogData {
       border-radius: 8px !important;
       color: #555;
       border-color: #ddd !important;
+    }
 
-      mat-icon {
-        font-size: 18px;
-        width: 18px;
-        height: 18px;
-        margin-right: 4px;
-      }
+    .cancel-btn mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+      margin-right: 4px;
     }
 
     .confirm-btn {
       flex: 1;
       height: 44px;
       border-radius: 8px !important;
-
-      mat-icon {
-        font-size: 18px;
-        width: 18px;
-        height: 18px;
-        margin-right: 4px;
-      }
-
-      &.danger  { background: #f44336 !important; color: white !important; }
-      &.warning { background: #ff9800 !important; color: white !important; }
-      &.info    { background: #2196f3 !important; color: white !important; }
     }
+
+    .confirm-btn mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+      margin-right: 4px;
+    }
+
+    .confirm-btn.danger  { background: #f44336 !important; color: white !important; }
+    .confirm-btn.warning { background: #ff9800 !important; color: white !important; }
+    .confirm-btn.info    { background: #2196f3 !important; color: white !important; }
   `]
 })
 export class ConfirmDialogComponent {

@@ -133,46 +133,69 @@ import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialo
         </mat-card-content>
       </mat-card>
 
+      <!-- Formulaire création/modification -->
       <mat-card class="mat-card-custom" style="margin-top:24px"
                 *ngIf="showForm && isAdmin">
         <mat-card-header>
           <mat-card-title>
-            {{ editId ? 'Modifier' : 'Nouveau' }} membre
+            {{ editId ? 'Modifier le membre' : 'Nouveau membre' }}
           </mat-card-title>
+          <mat-card-subtitle *ngIf="!editId">
+            Un compte de connexion sera créé automatiquement pour ce membre.
+          </mat-card-subtitle>
         </mat-card-header>
         <mat-card-content>
           <form [formGroup]="form" class="form-grid">
             <mat-form-field appearance="outline">
               <mat-label>Nom</mat-label>
               <input matInput formControlName="nom">
+              <mat-error>Obligatoire</mat-error>
             </mat-form-field>
+
             <mat-form-field appearance="outline">
               <mat-label>Prénom</mat-label>
               <input matInput formControlName="prenom">
+              <mat-error>Obligatoire</mat-error>
             </mat-form-field>
+
             <mat-form-field appearance="outline">
               <mat-label>Email</mat-label>
               <input matInput formControlName="email" type="email">
+              <mat-error>Email invalide</mat-error>
             </mat-form-field>
+
             <mat-form-field appearance="outline">
               <mat-label>Téléphone</mat-label>
               <input matInput formControlName="telephone">
             </mat-form-field>
+
             <mat-form-field appearance="outline">
               <mat-label>Date d'inscription</mat-label>
               <input matInput formControlName="dateInscription" type="date">
+              <mat-error>Obligatoire</mat-error>
             </mat-form-field>
+
             <mat-form-field appearance="outline">
               <mat-label>Date de naissance</mat-label>
               <input matInput formControlName="dateNaissance" type="date">
             </mat-form-field>
           </form>
+
+          <!-- Info sur le mot de passe par défaut -->
+          <div class="info-box" *ngIf="!editId">
+            <mat-icon>info</mat-icon>
+            <span>
+              Le mot de passe par défaut sera la partie avant @ de l'email + "123".
+              <br>Exemple : <strong>ahmed@gmail.com</strong> →
+              mot de passe : <strong>ahmed123</strong>
+            </span>
+          </div>
         </mat-card-content>
         <mat-card-actions align="end">
           <button mat-button (click)="cancelForm()">Annuler</button>
           <button mat-raised-button color="primary"
                   (click)="save()" [disabled]="form.invalid">
-            {{ editId ? 'Modifier' : 'Créer' }}
+            {{ editId ? 'Modifier' : 'Créer le compte' }}
           </button>
         </mat-card-actions>
       </mat-card>
@@ -184,6 +207,25 @@ import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialo
       grid-template-columns: 1fr 1fr;
       gap: 16px;
       padding-top: 16px;
+    }
+
+    .info-box {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      background: #e3f2fd;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-top: 16px;
+      font-size: 13px;
+      color: #1565c0;
+      line-height: 1.6;
+    }
+
+    .info-box mat-icon {
+      color: #1565c0;
+      flex-shrink: 0;
+      margin-top: 2px;
     }
   `]
 })
@@ -265,20 +307,44 @@ export class MembresListComponent implements OnInit, AfterViewInit {
 
   save(): void {
     if (this.form.invalid || !this.isAdmin) return;
-    const obs = this.editId
-      ? this.service.update(this.editId, this.form.value)
-      : this.service.create(this.form.value);
-    obs.subscribe({
-      next: () => {
-        this.snackBar.open(
-          this.editId ? 'Membre modifié ✓' : 'Membre créé ✓',
-          'OK', { duration: 2000 }
-        );
-        this.cancelForm();
-        this.load();
-      },
-      error: () => this.snackBar.open('Erreur', 'Fermer', { duration: 3000 })
-    });
+
+    if (this.editId) {
+      this.service.update(this.editId, this.form.value).subscribe({
+        next: () => {
+          this.snackBar.open('Membre modifié ✓', 'OK', { duration: 2000 });
+          this.cancelForm();
+          this.load();
+        },
+        error: () => this.snackBar.open('Erreur', 'Fermer', { duration: 3000 })
+      });
+    } else {
+      this.service.create(this.form.value).subscribe({
+        next: () => {
+          const email = this.form.get('email')?.value;
+          const defaultPassword = email.split('@')[0] + '123';
+
+          this.dialog.open(ConfirmDialogComponent, {
+            width: '460px',
+            data: {
+              title: 'Membre créé avec succès ✓',
+              message: `Le compte a été créé. Communiquez ces identifiants au membre :\n\n📧 Email : ${email}\n🔑 Mot de passe : ${defaultPassword}\n\nLe membre peut se connecter immédiatement avec ces identifiants.`,
+              confirmText: 'OK, compris',
+              cancelText: '',
+              type: 'info'
+            }
+          });
+
+          this.cancelForm();
+          this.load();
+        },
+        error: (err) => {
+          const msg = err.status === 409
+            ? 'Cet email est déjà utilisé'
+            : 'Erreur lors de la création';
+          this.snackBar.open(msg, 'Fermer', { duration: 3000 });
+        }
+      });
+    }
   }
 
   confirmDelete(m: MembreResponse): void {
@@ -286,9 +352,7 @@ export class MembresListComponent implements OnInit, AfterViewInit {
       width: '420px',
       data: {
         title: 'Supprimer ce membre ?',
-        message: `Vous êtes sur le point de supprimer définitivement
-                  "${m.prenom} ${m.nom}". Cette action est irréversible
-                  et supprimera aussi ses abonnements et réservations.`,
+        message: `Vous êtes sur le point de supprimer définitivement "${m.prenom} ${m.nom}".\n\nSes abonnements, réservations et paiements seront également supprimés. Son compte de connexion sera désactivé.\n\nCette action est irréversible.`,
         confirmText: 'Supprimer',
         cancelText: 'Annuler',
         type: 'danger'

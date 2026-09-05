@@ -3,6 +3,8 @@ package com.example.gymapi.service;
 import com.example.gymapi.dto.request.MembreRequest;
 import com.example.gymapi.dto.response.MembreResponse;
 import com.example.gymapi.entity.Membre;
+import com.example.gymapi.entity.User;
+import com.example.gymapi.enums.Role;
 import com.example.gymapi.enums.StatutMembre;
 import com.example.gymapi.exception.EmailAlreadyExistsException;
 import com.example.gymapi.exception.ResourceNotFoundException;
@@ -11,7 +13,9 @@ import com.example.gymapi.repository.MembreRepository;
 import com.example.gymapi.repository.PaiementRepository;
 import com.example.gymapi.repository.PresenceRepository;
 import com.example.gymapi.repository.ReservationRepository;
+import com.example.gymapi.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,10 +28,12 @@ import java.util.stream.Collectors;
 public class MembreService {
 
     private final MembreRepository membreRepository;
+    private final UserRepository userRepository;
     private final AbonnementRepository abonnementRepository;
     private final PaiementRepository paiementRepository;
     private final ReservationRepository reservationRepository;
     private final PresenceRepository presenceRepository;
+    private final PasswordEncoder passwordEncoder;
 
     public List<MembreResponse> findAll() {
         return membreRepository.findAll()
@@ -44,6 +50,21 @@ public class MembreService {
         if (membreRepository.existsByEmail(request.getEmail())) {
             throw new EmailAlreadyExistsException(request.getEmail());
         }
+
+        // Create User account so the member can log in
+        if (!userRepository.existsByEmail(request.getEmail())) {
+            String defaultPassword = request.getEmail().split("@")[0] + "123";
+            User user = User.builder()
+                    .nom(request.getNom())
+                    .prenom(request.getPrenom())
+                    .email(request.getEmail())
+                    .password(passwordEncoder.encode(defaultPassword))
+                    .role(Role.MEMBRE)
+                    .build();
+            userRepository.save(user);
+        }
+
+        // Create Membre entity
         Membre membre = Membre.builder()
                 .nom(request.getNom())
                 .prenom(request.getPrenom())
@@ -52,6 +73,7 @@ public class MembreService {
                 .dateNaissance(request.getDateNaissance())
                 .dateInscription(request.getDateInscription())
                 .build();
+
         return toResponse(membreRepository.save(membre));
     }
 
@@ -77,24 +99,24 @@ public class MembreService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                     "Membre non trouvé avec l'id: " + id));
 
-        // Supprimer d'abord toutes les données liées
-        // 1. Présences
+        // Delete all linked data first
         presenceRepository.deleteAll(
             presenceRepository.findByMembreId(id));
 
-        // 2. Réservations
         reservationRepository.deleteAll(
             reservationRepository.findByMembreId(id));
 
-        // 3. Paiements
         paiementRepository.deleteAll(
             paiementRepository.findByMembreId(id));
 
-        // 4. Abonnements
         abonnementRepository.deleteAll(
             abonnementRepository.findByMembreId(id));
 
-        // 5. Supprimer le membre
+        // Delete the user account too
+        userRepository.findByEmail(membre.getEmail())
+                .ifPresent(userRepository::delete);
+
+        // Delete the membre
         membreRepository.delete(membre);
     }
 
