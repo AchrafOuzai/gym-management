@@ -6,6 +6,8 @@ import com.example.gymapi.entity.Coach;
 import com.example.gymapi.entity.Seance;
 import com.example.gymapi.exception.ResourceNotFoundException;
 import com.example.gymapi.repository.CoachRepository;
+import com.example.gymapi.repository.PresenceRepository;
+import com.example.gymapi.repository.ReservationRepository;
 import com.example.gymapi.repository.SeanceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -22,9 +24,12 @@ public class SeanceService {
 
     private final SeanceRepository seanceRepository;
     private final CoachRepository coachRepository;
+    private final ReservationRepository reservationRepository;
+    private final PresenceRepository presenceRepository;
 
     public List<SeanceResponse> findAll() {
-        return seanceRepository.findAll().stream().map(this::toResponse).collect(Collectors.toList());
+        return seanceRepository.findAll()
+                .stream().map(this::toResponse).collect(Collectors.toList());
     }
 
     public List<SeanceResponse> findDisponibles() {
@@ -34,14 +39,16 @@ public class SeanceService {
 
     public SeanceResponse findById(Long id) {
         return toResponse(seanceRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Séance non trouvée avec l'id: " + id)));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                    "Séance non trouvée avec l'id: " + id)));
     }
 
     public SeanceResponse create(SeanceRequest request) {
         Coach coach = null;
         if (request.getCoachId() != null) {
             coach = coachRepository.findById(request.getCoachId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Coach non trouvé avec l'id: " + request.getCoachId()));
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                        "Coach non trouvé avec l'id: " + request.getCoachId()));
         }
         Seance seance = Seance.builder()
                 .titre(request.getTitre())
@@ -58,11 +65,13 @@ public class SeanceService {
 
     public SeanceResponse update(Long id, SeanceRequest request) {
         Seance seance = seanceRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Séance non trouvée avec l'id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                    "Séance non trouvée avec l'id: " + id));
         Coach coach = null;
         if (request.getCoachId() != null) {
             coach = coachRepository.findById(request.getCoachId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Coach non trouvé avec l'id: " + request.getCoachId()));
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                        "Coach non trouvé avec l'id: " + request.getCoachId()));
         }
         seance.setTitre(request.getTitre());
         seance.setDescription(request.getDescription());
@@ -76,10 +85,20 @@ public class SeanceService {
     }
 
     public void delete(Long id) {
-        if (!seanceRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Séance non trouvée avec l'id: " + id);
-        }
-        seanceRepository.deleteById(id);
+        Seance seance = seanceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                    "Séance non trouvée avec l'id: " + id));
+
+        // 1. Supprimer les présences liées
+        presenceRepository.deleteAll(
+            presenceRepository.findBySeanceId(id));
+
+        // 2. Supprimer les réservations liées
+        reservationRepository.deleteAll(
+            reservationRepository.findBySeanceId(id));
+
+        // 3. Supprimer la séance
+        seanceRepository.delete(seance);
     }
 
     private SeanceResponse toResponse(Seance s) {
@@ -95,7 +114,8 @@ public class SeanceService {
                 .placesRestantes(s.getCapaciteMax() - inscrits)
                 .salle(s.getSalle())
                 .coachId(s.getCoach() != null ? s.getCoach().getId() : null)
-                .coachNomComplet(s.getCoach() != null ? s.getCoach().getPrenom() + " " + s.getCoach().getNom() : null)
+                .coachNomComplet(s.getCoach() != null
+                    ? s.getCoach().getPrenom() + " " + s.getCoach().getNom() : null)
                 .build();
     }
 }

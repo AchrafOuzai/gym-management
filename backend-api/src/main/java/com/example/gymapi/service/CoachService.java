@@ -3,9 +3,12 @@ package com.example.gymapi.service;
 import com.example.gymapi.dto.request.CoachRequest;
 import com.example.gymapi.dto.response.CoachResponse;
 import com.example.gymapi.entity.Coach;
+import com.example.gymapi.enums.TypeSeance;
 import com.example.gymapi.exception.EmailAlreadyExistsException;
 import com.example.gymapi.exception.ResourceNotFoundException;
 import com.example.gymapi.repository.CoachRepository;
+import com.example.gymapi.repository.ProgrammeEntrainementRepository;
+import com.example.gymapi.repository.SeanceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,18 +22,23 @@ import java.util.stream.Collectors;
 public class CoachService {
 
     private final CoachRepository coachRepository;
+    private final SeanceRepository seanceRepository;
+    private final ProgrammeEntrainementRepository programmeRepository;
 
     public List<CoachResponse> findAll() {
-        return coachRepository.findAll().stream().map(this::toResponse).collect(Collectors.toList());
+        return coachRepository.findAll()
+                .stream().map(this::toResponse).collect(Collectors.toList());
     }
 
     public List<CoachResponse> findActifs() {
-        return coachRepository.findByActifTrue().stream().map(this::toResponse).collect(Collectors.toList());
+        return coachRepository.findByActifTrue()
+                .stream().map(this::toResponse).collect(Collectors.toList());
     }
 
     public CoachResponse findById(Long id) {
         return toResponse(coachRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Coach non trouvé avec l'id: " + id)));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                    "Coach non trouvé avec l'id: " + id)));
     }
 
     public CoachResponse create(CoachRequest request) {
@@ -51,8 +59,10 @@ public class CoachService {
 
     public CoachResponse update(Long id, CoachRequest request) {
         Coach coach = coachRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Coach non trouvé avec l'id: " + id));
-        if (!coach.getEmail().equals(request.getEmail()) && coachRepository.existsByEmail(request.getEmail())) {
+                .orElseThrow(() -> new ResourceNotFoundException(
+                    "Coach non trouvé avec l'id: " + id));
+        if (!coach.getEmail().equals(request.getEmail())
+                && coachRepository.existsByEmail(request.getEmail())) {
             throw new EmailAlreadyExistsException(request.getEmail());
         }
         coach.setNom(request.getNom());
@@ -67,16 +77,29 @@ public class CoachService {
 
     public void desactiver(Long id) {
         Coach coach = coachRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Coach non trouvé avec l'id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                    "Coach non trouvé avec l'id: " + id));
         coach.setActif(false);
         coachRepository.save(coach);
     }
 
     public void delete(Long id) {
-        if (!coachRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Coach non trouvé avec l'id: " + id);
-        }
-        coachRepository.deleteById(id);
+        Coach coach = coachRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                    "Coach non trouvé avec l'id: " + id));
+
+        // 1. Détacher le coach des séances (ne pas supprimer les séances)
+        seanceRepository.findByCoachId(id).forEach(s -> {
+            s.setCoach(null);
+            seanceRepository.save(s);
+        });
+
+        // 2. Supprimer les programmes du coach
+        programmeRepository.deleteAll(
+            programmeRepository.findByCoachId(id));
+
+        // 3. Supprimer le coach
+        coachRepository.delete(coach);
     }
 
     private CoachResponse toResponse(Coach c) {

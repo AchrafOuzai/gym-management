@@ -3,9 +3,14 @@ package com.example.gymapi.service;
 import com.example.gymapi.dto.request.MembreRequest;
 import com.example.gymapi.dto.response.MembreResponse;
 import com.example.gymapi.entity.Membre;
+import com.example.gymapi.enums.StatutMembre;
 import com.example.gymapi.exception.EmailAlreadyExistsException;
 import com.example.gymapi.exception.ResourceNotFoundException;
+import com.example.gymapi.repository.AbonnementRepository;
 import com.example.gymapi.repository.MembreRepository;
+import com.example.gymapi.repository.PaiementRepository;
+import com.example.gymapi.repository.PresenceRepository;
+import com.example.gymapi.repository.ReservationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,14 +24,20 @@ import java.util.stream.Collectors;
 public class MembreService {
 
     private final MembreRepository membreRepository;
+    private final AbonnementRepository abonnementRepository;
+    private final PaiementRepository paiementRepository;
+    private final ReservationRepository reservationRepository;
+    private final PresenceRepository presenceRepository;
 
     public List<MembreResponse> findAll() {
-        return membreRepository.findAll().stream().map(this::toResponse).collect(Collectors.toList());
+        return membreRepository.findAll()
+                .stream().map(this::toResponse).collect(Collectors.toList());
     }
 
     public MembreResponse findById(Long id) {
         return toResponse(membreRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Membre non trouvé avec l'id: " + id)));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                    "Membre non trouvé avec l'id: " + id)));
     }
 
     public MembreResponse create(MembreRequest request) {
@@ -46,8 +57,10 @@ public class MembreService {
 
     public MembreResponse update(Long id, MembreRequest request) {
         Membre membre = membreRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Membre non trouvé avec l'id: " + id));
-        if (!membre.getEmail().equals(request.getEmail()) && membreRepository.existsByEmail(request.getEmail())) {
+                .orElseThrow(() -> new ResourceNotFoundException(
+                    "Membre non trouvé avec l'id: " + id));
+        if (!membre.getEmail().equals(request.getEmail())
+                && membreRepository.existsByEmail(request.getEmail())) {
             throw new EmailAlreadyExistsException(request.getEmail());
         }
         membre.setNom(request.getNom());
@@ -60,14 +73,40 @@ public class MembreService {
     }
 
     public void delete(Long id) {
-        if (!membreRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Membre non trouvé avec l'id: " + id);
-        }
-        membreRepository.deleteById(id);
+        Membre membre = membreRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                    "Membre non trouvé avec l'id: " + id));
+
+        // Supprimer d'abord toutes les données liées
+        // 1. Présences
+        presenceRepository.deleteAll(
+            presenceRepository.findByMembreId(id));
+
+        // 2. Réservations
+        reservationRepository.deleteAll(
+            reservationRepository.findByMembreId(id));
+
+        // 3. Paiements
+        paiementRepository.deleteAll(
+            paiementRepository.findByMembreId(id));
+
+        // 4. Abonnements
+        abonnementRepository.deleteAll(
+            abonnementRepository.findByMembreId(id));
+
+        // 5. Supprimer le membre
+        membreRepository.delete(membre);
     }
 
     public List<MembreResponse> search(String keyword) {
-        return membreRepository.findByNomContainingIgnoreCaseOrPrenomContainingIgnoreCase(keyword, keyword)
+        return membreRepository
+                .findByNomContainingIgnoreCaseOrPrenomContainingIgnoreCase(
+                    keyword, keyword)
+                .stream().map(this::toResponse).collect(Collectors.toList());
+    }
+
+    public List<MembreResponse> findByStatut(StatutMembre statut) {
+        return membreRepository.findByStatut(statut)
                 .stream().map(this::toResponse).collect(Collectors.toList());
     }
 
