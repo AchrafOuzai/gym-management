@@ -104,11 +104,7 @@ import { AuthService } from '../../../core/services/auth.service';
               <span matListItemTitle class="nav-text">Paiements</span>
             </a>
 
-            <a mat-list-item routerLink="/admin/create-user"
-               routerLinkActive="active-link" class="nav-item">
-              <mat-icon matListItemIcon class="nav-icon">person_add</mat-icon>
-              <span matListItemTitle class="nav-text">Créer utilisateur</span>
-            </a>
+            
           </ng-container>
 
           <ng-container *ngIf="isMembre()">

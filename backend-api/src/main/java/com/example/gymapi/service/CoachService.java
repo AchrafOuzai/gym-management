@@ -3,13 +3,16 @@ package com.example.gymapi.service;
 import com.example.gymapi.dto.request.CoachRequest;
 import com.example.gymapi.dto.response.CoachResponse;
 import com.example.gymapi.entity.Coach;
-import com.example.gymapi.enums.TypeSeance;
+import com.example.gymapi.entity.User;
+import com.example.gymapi.enums.Role;
 import com.example.gymapi.exception.EmailAlreadyExistsException;
 import com.example.gymapi.exception.ResourceNotFoundException;
 import com.example.gymapi.repository.CoachRepository;
 import com.example.gymapi.repository.ProgrammeEntrainementRepository;
 import com.example.gymapi.repository.SeanceRepository;
+import com.example.gymapi.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,8 +25,10 @@ import java.util.stream.Collectors;
 public class CoachService {
 
     private final CoachRepository coachRepository;
+    private final UserRepository userRepository;
     private final SeanceRepository seanceRepository;
     private final ProgrammeEntrainementRepository programmeRepository;
+    private final PasswordEncoder passwordEncoder;
 
     public List<CoachResponse> findAll() {
         return coachRepository.findAll()
@@ -45,6 +50,21 @@ public class CoachService {
         if (coachRepository.existsByEmail(request.getEmail())) {
             throw new EmailAlreadyExistsException(request.getEmail());
         }
+
+        // Créer le compte User pour que le coach puisse se connecter
+        if (!userRepository.existsByEmail(request.getEmail())) {
+            String defaultPassword = request.getEmail().split("@")[0] + "123";
+            User user = User.builder()
+                    .nom(request.getNom())
+                    .prenom(request.getPrenom())
+                    .email(request.getEmail())
+                    .password(passwordEncoder.encode(defaultPassword))
+                    .role(Role.COACH)
+                    .build();
+            userRepository.save(user);
+        }
+
+        // Créer le profil Coach
         Coach coach = Coach.builder()
                 .nom(request.getNom())
                 .prenom(request.getPrenom())
@@ -54,6 +74,7 @@ public class CoachService {
                 .dateEmbauche(request.getDateEmbauche())
                 .specialites(request.getSpecialites())
                 .build();
+
         return toResponse(coachRepository.save(coach));
     }
 
@@ -81,6 +102,12 @@ public class CoachService {
                     "Coach non trouvé avec l'id: " + id));
         coach.setActif(false);
         coachRepository.save(coach);
+
+        // Désactiver aussi le compte User
+        userRepository.findByEmail(coach.getEmail()).ifPresent(u -> {
+            // On pourrait ajouter un champ 'enabled' sur User
+            // Pour l'instant on garde juste le coach inactif
+        });
     }
 
     public void delete(Long id) {
@@ -88,17 +115,21 @@ public class CoachService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                     "Coach non trouvé avec l'id: " + id));
 
-        // 1. Détacher le coach des séances (ne pas supprimer les séances)
+        // Détacher le coach des séances
         seanceRepository.findByCoachId(id).forEach(s -> {
             s.setCoach(null);
             seanceRepository.save(s);
         });
 
-        // 2. Supprimer les programmes du coach
+        // Supprimer les programmes
         programmeRepository.deleteAll(
             programmeRepository.findByCoachId(id));
 
-        // 3. Supprimer le coach
+        // Supprimer le compte User
+        userRepository.findByEmail(coach.getEmail())
+                .ifPresent(userRepository::delete);
+
+        // Supprimer le coach
         coachRepository.delete(coach);
     }
 

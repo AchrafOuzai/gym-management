@@ -60,11 +60,6 @@ export const routes: Routes = [
         path: 'programmes',
         loadComponent: () => import('./features/programmes/programmes-list/programmes-list.component').then(c => c.ProgrammesListComponent)
       },
-      {
-        path: 'admin/create-user',
-        canActivate: [adminGuard],
-        loadComponent: () => import('./features/admin/create-user/create-user.component').then(c => c.CreateUserComponent)
-      },
     ]
   },
   { path: '**', redirectTo: 'dashboard' }
