@@ -25,7 +25,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '17'
           distribution: 'temurin'
@@ -60,10 +60,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Node.js 20
+      - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: gym-frontend/package-lock.json
 
@@ -101,6 +101,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Convert owner to lowercase
+        id: owner
+        run: echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
+      - name: Set image names
+        id: images
+        run: |
+          echo "backend=ghcr.io/${{ steps.owner.outputs.owner }}/gym-backend" >> $GITHUB_OUTPUT
+          echo "frontend=ghcr.io/${{ steps.owner.outputs.owner }}/gym-frontend" >> $GITHUB_OUTPUT
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -112,41 +122,34 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build & Push Backend image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./backend-api
-          dockerfile: ./backend-api/Dockerfile
+          file: ./backend-api/Dockerfile
           push: true
           tags: |
-            ${{ env.BACKEND_IMAGE }}:latest
-            ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+            ${{ steps.images.outputs.backend }}:latest
+            ${{ steps.images.outputs.backend }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Build & Push Frontend image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./gym-frontend
-          dockerfile: ./gym-frontend/Dockerfile
+          file: ./gym-frontend/Dockerfile
           push: true
           tags: |
-            ${{ env.FRONTEND_IMAGE }}:latest
-            ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
+            ${{ steps.images.outputs.frontend }}:latest
+            ${{ steps.images.outputs.frontend }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Summary
         run: |
-          echo "## 🚀 Pipeline réussi !" >> $GITHUB_STEP_SUMMARY
+          echo "##  Pipeline réussi !" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### ✅ Images publiées sur GitHub Registry :" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ env.BACKEND_IMAGE }}:latest\`" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ env.FRONTEND_IMAGE }}:latest\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📦 Commit : \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🐳 Pour utiliser les images :" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-          echo "docker pull ${{ env.BACKEND_IMAGE }}:latest" >> $GITHUB_STEP_SUMMARY
-          echo "docker pull ${{ env.FRONTEND_IMAGE }}:latest" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "###  Images publiées :" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ steps.images.outputs.backend }}:latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ steps.images.outputs.frontend }}:latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "###  Commit : \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
